@@ -1,12 +1,12 @@
-# (TODO: your game's title)
+# Extreme Beam Quarantine
 
-Author: (TODO: your name)
+Author: Greg Loose
 
 Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
 
 Screen Shot:
 
-![Screen Shot](screenshot.png)
+![Screen Shot](dist/screenshot.png)
 
 How To Play:
 
