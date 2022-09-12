@@ -16,6 +16,8 @@ At the start of the game, the island is covered with meeples (board-game-inspire
 * If even ONE meeple in a chunk is infected (dark red), you receive 10 points per meeple.
 * For every meeple that you hit with the beam (that is, destroy the tile they're standing on), you LOSE 200 points.
 
-In other words, the goal of the game is to partition the map into chunks such that each chunk contains only healthy meeples or only sick meeples, with more points awarded for healthy meeples. However, you must do so quickly, as infected meeples will spread the disease to those nearby. Each healthy meeple's progress toward infection is indicated by their color, going from white to yellow to orange to bright red, and finally to dark red.
+In other words, the goal of the game is to partition the map into chunks such that each chunk contains only healthy meeples or only sick meeples, with more points awarded for healthy meeples. However, you must do so quickly, as infected meeples will spread the disease to those nearby. Each healthy meeple's progress towards infection is indicated by their color, going from white to yellow to orange to bright red, and finally to dark red.
+
+The game ends when you have sliced up the entire map, or when the last chunk of the map becomes completely infected. Try to score as many points as you can!
 
 This game was built with [NEST](NEST.md).
