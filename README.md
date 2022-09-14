@@ -29,7 +29,7 @@ In other words, the goal of the game is to partition the map into chunks such th
 The game ends when you have sliced up the entire map, or when the last chunk of the map becomes completely infected. Try to score as many points as you can!
 
 ### Tips
-* You earn a "grade" based on your performance, essentially representing the ratio of your current score to the best possible score you could have earned based on the number of meeples you've quarantined, killed, or allowed to be infected. If you can play perfectly, you'll earn the coveted SS rating!
+* You earn a "grade" based on your performance, essentially representing the ratio of your current score to the best possible score you could have earned based on the number of meeples that have been quarantined, killed, or infected. If you can play perfectly, you'll earn the coveted SS rating!
 * Keep an eye on your meeple colors! A group of orange and red meeples can quickly turn into a devastating outbreak. Try separating them from the infected before it can get to that point.
 * Sick meeples move more quickly than healthy ones, making them difficult to catch. If a decent opportunity presents itself, it is often worth it to catch a few healthy meeples along with a sick one just to take it out of play.
 * Meeples move from tile to tile at a rhythmic pace, and tend to prefer moving in the same direction as they have previously. This allows you to predict their movements and avoid killing them by destroying a tile as they are jumping to it.
