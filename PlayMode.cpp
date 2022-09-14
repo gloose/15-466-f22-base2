@@ -195,43 +195,47 @@ void PlayMode::destroyTile(GroundTile* tile) {
 	// Destroy all smaller chunks
 	for (size_t i = 0; i < chunk_roots.size(); i++) {
 		if (chunk_roots[i]->chunk != biggest_chunk) {
-			size_t healthy = 0;
-			size_t sick = 0;
-			std::deque<GroundTile*> to_visit;
-			chunk_roots[i]->falling = true;
-			to_visit.push_back(chunk_roots[i]);
-			while (!to_visit.empty()) {
-				GroundTile* visiting = to_visit.front();
-				to_visit.pop_front();
-				glm::ivec2 vpos = getTilePos(visiting);
-				for (size_t j = 0; j < directions.size(); j++) {
-					GroundTile* neighbor = getTileAtPos(vpos + directions[j]);
-					if (neighbor != nullptr) {
-						neighbor->falling = true;
-						to_visit.push_back(neighbor);
+			dropChunk(chunk_roots[i]);
+		}
+	}
+}
 
-						if (neighbor->meeple) {
-							if (neighbor->meeple->sick) {
-								sick++;
-							}
-							else {
-								healthy++;
-							}
-						}
+void PlayMode::dropChunk(GroundTile* root) {
+	size_t healthy = 0;
+	size_t sick = 0;
+	std::deque<GroundTile*> to_visit;
+	root->falling = true;
+	to_visit.push_back(root);
+	while (!to_visit.empty()) {
+		GroundTile* visiting = to_visit.front();
+		to_visit.pop_front();
+		glm::ivec2 vpos = getTilePos(visiting);
+		for (size_t j = 0; j < directions.size(); j++) {
+			GroundTile* neighbor = getTileAtPos(vpos + directions[j]);
+			if (neighbor != nullptr) {
+				neighbor->falling = true;
+				to_visit.push_back(neighbor);
+
+				if (neighbor->meeple) {
+					if (neighbor->meeple->sick) {
+						sick++;
+					}
+					else {
+						healthy++;
 					}
 				}
 			}
-
-			// Calculate score from this chunk
-			if (sick == 0) {
-				score += (int)healthy * score_healthy;
-			}
-			else {
-				score += (int)(healthy + sick) * score_sick;
-			}
-			perfect_score += (int)healthy * score_healthy + (int)sick * score_sick;
 		}
 	}
+
+	// Calculate score from this chunk
+	if (sick == 0) {
+		score += (int)healthy * score_healthy;
+	}
+	else {
+		score += (int)(healthy + sick) * score_sick;
+	}
+	perfect_score += (int)healthy * score_healthy + (int)sick * score_sick;
 }
 
 void PlayMode::setMesh(Scene::Drawable* drawable, std::string mesh_name) {
@@ -586,10 +590,23 @@ void PlayMode::update(float elapsed) {
 	}
 
 	// Update meeples
+	bool all_sick = true;
+	GroundTile* root = nullptr;
 	for (size_t i = 0; i < meeples.size(); i++) {
 		Meeple* meeple = meeples[i];
 		
 		if (meeple->tile->exists) {
+			if (meeple->sick) {
+				// If this meeple is sick and we don't already have one, set root tile to this one
+				if (root == nullptr) {
+					root = meeple->tile;
+				}
+			}
+			else {
+				// If this meeple isn't sick, they aren't all sick
+				all_sick = false;
+			}
+
 			// Set jump constants based on meeple's health
 			float wait = jump_wait_duration;
 			float h = jump_height;
@@ -711,6 +728,11 @@ void PlayMode::update(float elapsed) {
 			// Hide meeple if its tile has been destroyed
 			meeple->drawable->transform->position[2] = -100.f;
 		}
+	}
+
+	// If all meeples are sick, the game is over
+	if (all_sick && root != nullptr) {
+		dropChunk(root);
 	}
 
 	// Create cloud

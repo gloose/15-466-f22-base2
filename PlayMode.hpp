@@ -121,7 +121,7 @@ struct PlayMode : Mode {
 	const float elasticity = 1.f;
 
 	// Number of meeples and fraction of sick meeples at the start of the game
-	int start_meeples = 100;
+	size_t start_meeples = 100;
 	float start_sick = 0.1f;
 
 	// Score earned this game
@@ -180,4 +180,5 @@ struct PlayMode : Mode {
 	void placeMeeples();
 	void deleteCloud(size_t i);
 	void setLevel(int level);
+	void dropChunk(GroundTile* tile);
 };
