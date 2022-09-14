@@ -29,6 +29,7 @@ In other words, the goal of the game is to partition the map into chunks such th
 The game ends when you have sliced up the entire map, or when the last chunk of the map becomes completely infected. Try to score as many points as you can!
 
 ### Tips
+* Keep an eye on your meeple colors! A group of orange and red meeples can quickly turn into a devastating outbreak. Try separating them from the infected before it can get to that point.
 * Sick meeples move more quickly than healthy ones, making them difficult to catch. If a decent opportunity presents itself, it is often worth it to catch a few healthy meeples along with a sick one just to take it out of play.
 * Meeples move from tile to tile at a rhythmic pace, and tend to prefer moving in the same direction as they have previously. This allows you to predict their movements and avoid killing them by destroying a tile as they are jumping to it.
 * When you complete a slice through the map, the logic is actually a bit more complicated than "the smaller chunks fall off the screen". Specifically, one chunk is chosen to remain while all other non-contiguous chunks are dropped. In general, the remaining chunk is the one with the highest population; however, any chunk containing only healthy or only sick meeples will always be dropped, even if it is otherwise the largest chunk.
