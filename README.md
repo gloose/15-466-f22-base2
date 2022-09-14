@@ -2,7 +2,7 @@
 
 Author: Greg Loose
 
-Design: Extreme Beam Quarantine is a top-down "shooter" game loosely inspired by Qix (1981). You control a laser cannon mounted at the center of a floating island on the precipice of a pandemic, with the goal of slicing the island into pieces to separate the healthy from the infected.
+Design: Extreme Beam Quarantine is a top-down "shooter" game inspired (very loosely) by Qix (1981). You control a laser cannon mounted at the center of a floating island on the precipice of a pandemic, with the goal of slicing the island into pieces to separate the healthy from the infected.
 
 Screen Shot:
 
