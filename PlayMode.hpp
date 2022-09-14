@@ -120,19 +120,51 @@ struct PlayMode : Mode {
 	const float inertia = 0.5f;
 	const float elasticity = 1.f;
 
-	// Fraction of tiles holding a meeple at the start of the game
-	const float population_density = 0.05f;
+	// Number of meeples and fraction of sick meeples at the start of the game
+	int start_meeples = 100;
+	float start_sick = 0.1f;
 
 	// Score earned this game
 	int score = 0;
 
+	// Maximum possible score that could have been earned from the people eliminateed so far
+	int perfect_score = 0;
+
 	// Score values for various actions
 	int score_healthy = 100;
-	int score_sick = 10;
+	int score_sick = 50;
 	int score_kill = -200;
 
 	// Speed at which the ground target moves
 	const float target_move_speed = 4.f;
+
+	// Prevent the player from aiming beyond a certain distrance from the map
+	const float max_target_distance = (map_radius + 4) * tile_size;
+
+	// Struct representing a cloud
+	struct Cloud {
+		Scene::Transform* transform;
+		Scene::Drawable* drawable;
+		float speed;
+	};
+
+	// Cloud properties
+	float cloud_timer = 0.f;
+	const float cloud_min_interval = 1.f;
+	const float cloud_max_interval = 2.f;
+	const float cloud_min_length = 4.f;
+	const float cloud_max_length = 20.f;
+	const float cloud_min_width = 2.f;
+	const float cloud_max_width = 15.f;
+	const float cloud_min_height = 2.f;
+	const float cloud_max_height = 5.f;
+	const float cloud_min_speed = 1.f;
+	const float cloud_max_speed = 10.f;
+	const float cloud_min_altitude = -50.f;
+	const float cloud_max_altitude = -5.f;
+
+	// Vector of all clouds
+	std::vector<Cloud*> clouds;
 
 	// Helper functions
 	bool isInRing(glm::ivec2 pos);
@@ -144,5 +176,8 @@ struct PlayMode : Mode {
 	void destroyTile(GroundTile* tile);
 	void setMesh(Scene::Drawable* drawable, std::string mesh);
 	void infect(Meeple* meeple, float exposure);
-	void reset();
+	void reset(int level = 0);
+	void placeMeeples();
+	void deleteCloud(size_t i);
+	void setLevel(int level);
 };

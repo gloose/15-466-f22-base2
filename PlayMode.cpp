@@ -29,7 +29,7 @@ Load< MeshBuffer > cannon_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 	return ret;
 });
 
-Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
+Load< Scene > cannon_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("cannon.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
 		// Cannon parts are kept in place; all others will need to be instantiated dynamically
 		if (transform->name == "Pole" || transform->name == "Holder" || transform->name == "Cannon" || transform->name == "Nozzle") {
@@ -99,6 +99,7 @@ void PlayMode::destroyTile(GroundTile* tile) {
 	// Incur score penalty for meeple death
 	if (tile->meeple) {
 		score += score_kill;
+		perfect_score += score_healthy;
 	}
 
 	// Get tile grid position
@@ -228,6 +229,7 @@ void PlayMode::destroyTile(GroundTile* tile) {
 			else {
 				score += (int)(healthy + sick) * score_sick;
 			}
+			perfect_score += (int)healthy * score_healthy + (int)sick * score_sick;
 		}
 	}
 }
@@ -254,8 +256,9 @@ void PlayMode::infect(Meeple* meeple, float exposure) {
 	meeple->infection += exposure;
 
 	// If infection crossed the final threshold, meeple is sick
-	if (meeple->infection >= infection_threshold) {
+	if (meeple->infection >= infection_threshold && !meeple->sick) {
 		meeple->sick = true;
+		perfect_score += score_healthy - score_sick;
 	}
 	
 	// Set meeple mesh based on level of infection
@@ -269,9 +272,10 @@ void PlayMode::infect(Meeple* meeple, float exposure) {
 	}
 }
 
-void PlayMode::reset() {
+void PlayMode::reset(int level) {
 	// Reset score
 	score = 0;
+	perfect_score = 0;
 
 	// Reset target
 	target = glm::vec3(0.f, -1.5f, 0.f);
@@ -285,9 +289,15 @@ void PlayMode::reset() {
 				break;
 			}
 		}
+		delete drawable.transform;
 		delete meeples[i];
 	}
 	meeples.clear();
+
+	// Delete clouds
+	while (!clouds.empty()) {
+		deleteCloud(0);
+	}
 
 	// Initialize map
 	for (int i = 0; i < map_diameter; i++) {
@@ -303,28 +313,6 @@ void PlayMode::reset() {
 				map[index].meeple = nullptr;
 				map[index].visited_for = nullptr;
 				map[index].velocity = glm::vec3(0.f, 0.f, 0.f);
-
-				// Random chance to put a meeple on the tile
-				if ((float)rand() / (float)RAND_MAX < population_density) {
-					scene.transforms.emplace_back();
-					scene.transforms.back().position = glm::vec3(x * tile_size, y * tile_size, 0);
-					scene.transforms.back().name = "Meeple_0";
-
-					scene.drawables.emplace_back(&scene.transforms.back());
-					setMesh(&scene.drawables.back(), "Meeple_0");
-
-					meeples.push_back(new Meeple);
-					meeples.back()->drawable = &scene.drawables.back();
-					meeples.back()->tile = &map[index];
-					float theta = (float)rand() / (float)RAND_MAX * 2.f * float(M_PI);
-					meeples.back()->dir = glm::vec2(cosf(theta), sinf(theta));
-					meeples.back()->jump_wait_timer = (float)rand() / (float)RAND_MAX * jump_wait_duration;
-					map[index].meeple = meeples.back();
-
-					if (rand() % 10 == 0) {
-						infect(meeples.back(), infection_threshold);
-					}
-				}
 			}
 			else {
 				// No tile here
@@ -332,9 +320,77 @@ void PlayMode::reset() {
 			}
 		}
 	}
+
+	// Set difficulty
+	if (level > 0) {
+		setLevel(level);
+	}
+
+	// Populate board with meeples
+	placeMeeples();
+
+	// Reset perfect score
+	perfect_score = 0;
 }
 
-PlayMode::PlayMode() : scene(*hexapod_scene) {
+void PlayMode::setLevel(int level) {
+	start_meeples = 50 + level * 10;
+}
+
+void PlayMode::placeMeeples() {
+	for (size_t i = 0; i < start_meeples; i++) {
+		size_t max_attempts = 100;
+		for (size_t attempt = 0; attempt < max_attempts; attempt++) {
+			size_t index = rand() % map.size();
+			if (map[index].exists && !map[index].meeple) {
+				//scene.transforms.emplace_back();
+				Scene::Transform* transform = new Scene::Transform;
+				transform->position = map[index].transform->position;
+				transform->name = "Meeple_0";
+
+				scene.drawables.emplace_back(transform);
+				setMesh(&scene.drawables.back(), "Meeple_0");
+
+				meeples.push_back(new Meeple);
+				meeples.back()->drawable = &scene.drawables.back();
+				meeples.back()->tile = &map[index];
+				float theta = (float)rand() / (float)RAND_MAX * 2.f * float(M_PI);
+				meeples.back()->dir = glm::vec2(cosf(theta), sinf(theta));
+				meeples.back()->jump_wait_timer = (float)rand() / (float)RAND_MAX * jump_wait_duration;
+				meeples.back()->sick = false;
+				meeples.back()->infection = 0;
+				meeples.back()->jumping_from = nullptr;
+				meeples.back()->jumping_to = nullptr;
+				map[index].meeple = meeples.back();
+
+				break;
+			}
+		}
+	}
+
+	size_t num_sick = (size_t)((float)meeples.size() * start_sick);
+	for (size_t i = 0; i < num_sick; i ++) {
+		infect(meeples[i], infection_threshold);
+	}
+}
+
+void PlayMode::deleteCloud(size_t i) {
+	const Scene::Drawable drawable = *clouds[i]->drawable;
+	for (auto it = scene.drawables.begin(); it != scene.drawables.end(); it++) {
+		if (it->pipeline.start == drawable.pipeline.start && it->transform == drawable.transform) {
+			scene.drawables.erase(it);
+			break;
+		}
+	}
+	delete drawable.transform;
+	delete clouds[i];
+	clouds.erase(clouds.begin() + i);
+}
+
+PlayMode::PlayMode() : scene(*cannon_scene) {
+	// Set random seed for a different experience every time
+	srand((int)time(nullptr));
+
 	// Initialize map
 	for (int i = 0; i < map_diameter; i++) {
 		for (int j = 0; j < map_diameter; j++) {
@@ -349,33 +405,16 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 
 				// Create drawable for ground tile
 				scene.drawables.emplace_back(&scene.transforms.back());
-				setMesh(&scene.drawables.back(), "Ground");
-
+				if (index % 2 == 0) {
+					setMesh(&scene.drawables.back(), "Ground_0");
+				}
+				else {
+					setMesh(&scene.drawables.back(), "Ground_1");
+				}
+				
 				// Add ground tile to map
 				map[index].transform = &scene.transforms.back();
 				map[index].exists = true;
-
-				// Random chance to put a meeple on the tile
-				if ((float)rand() / (float)RAND_MAX < population_density) {
-					scene.transforms.emplace_back();
-					scene.transforms.back().position = glm::vec3(x * tile_size, y * tile_size, 0);
-					scene.transforms.back().name = "Meeple_0";
-
-					scene.drawables.emplace_back(&scene.transforms.back());
-					setMesh(&scene.drawables.back(), "Meeple_0");
-
-					meeples.push_back(new Meeple);
-					meeples.back()->drawable = &scene.drawables.back();
-					meeples.back()->tile = &map[index];
-					float theta = (float)rand() / (float)RAND_MAX * 2.f * float(M_PI);
-					meeples.back()->dir = glm::vec2(cosf(theta), sinf(theta));
-					meeples.back()->jump_wait_timer = (float)rand() / (float)RAND_MAX * jump_wait_duration;
-					map[index].meeple = meeples.back();
-
-					if (rand() % 10 == 0) {
-						infect(meeples.back(), infection_threshold);
-					}
-				}
 			}
 			else {
 				// No tile here
@@ -383,6 +422,13 @@ PlayMode::PlayMode() : scene(*hexapod_scene) {
 			}
 		}
 	}
+
+	// Set level to determine meeple population, then create meeples
+	setLevel(1);
+	placeMeeples();
+
+	// Reset perfect score (placeMeeples modifies it by infecting meeples)
+	perfect_score = 0;
 
 	// Get cannon part transforms
 	for (auto& transform : scene.transforms) {
@@ -426,6 +472,42 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			reset();
 			return true;
 		}
+		else if (evt.key.keysym.sym == SDLK_1) {
+			reset(1);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_2) {
+			reset(2);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_3) {
+			reset(3);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_4) {
+			reset(4);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_5) {
+			reset(5);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_6) {
+			reset(6);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_7) {
+			reset(7);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_8) {
+			reset(8);
+			return true;
+		}
+		else if (evt.key.keysym.sym == SDLK_9) {
+			reset(9);
+			return true;
+		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
 			left.pressed = false;
@@ -447,17 +529,26 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 	// Move target based on player input
+	glm::vec3 d_target(0, 0, 0);
 	if (left.pressed) {
-		target[0] -= target_move_speed * elapsed;
+		d_target[0] --;
 	}
 	if (right.pressed) {
-		target[0] += target_move_speed * elapsed;
+		d_target[0] ++;
 	}
 	if (up.pressed) {
-		target[1] += target_move_speed * elapsed;
+		d_target[1] ++;
 	}
 	if (down.pressed) {
-		target[1] -= target_move_speed * elapsed;
+		d_target[1] --;
+	}
+	if (glm::length(d_target) > 1) {
+		d_target /= glm::length(d_target);
+	}
+	target += d_target * target_move_speed * elapsed;
+
+	if (glm::length(target) > max_target_distance) {
+		target *= max_target_distance / glm::length(target);
 	}
 	
 	// Update rotation of laser cannon
@@ -622,6 +713,46 @@ void PlayMode::update(float elapsed) {
 		}
 	}
 
+	// Create cloud
+	cloud_timer -= elapsed;
+	if (cloud_timer <= 0) {
+		Cloud* cloud = new Cloud;
+		cloud->transform = new Scene::Transform();
+		scene.drawables.emplace_back(cloud->transform);
+		cloud->drawable = &scene.drawables.back();
+		setMesh(cloud->drawable, "Cloud");
+
+		auto randFloat = [](float min, float max) -> float {
+			return min + (float)rand() / (float)RAND_MAX * (max - min);
+		};
+
+		// Set cloud position
+		cloud->transform->position.x = randFloat(-map_radius * 1.5, map_radius * 1.5);
+		cloud->transform->position.y = camera->transform->position.y;
+		cloud->transform->position.z = randFloat(cloud_min_altitude, cloud_max_altitude);
+		
+		// Set cloud size
+		cloud->transform->scale.x = randFloat(cloud_min_width, cloud_max_width);
+		cloud->transform->scale.y = randFloat(cloud_min_length, cloud_max_length);
+		cloud->transform->scale.z = randFloat(cloud_min_height, cloud_max_height);
+
+		// Set cloud speed
+		cloud->speed = randFloat(cloud_min_speed, cloud_max_speed);
+
+		clouds.push_back(cloud);
+
+		cloud_timer = randFloat(cloud_min_interval, cloud_max_interval);
+	}
+
+	// Update clouds
+	for (size_t i = 0; i < clouds.size(); i++) {
+		clouds[i]->transform->position += glm::vec3(0.f, clouds[i]->speed * elapsed, 0.f);
+		if (clouds[i]->transform->position.y - clouds[i]->transform->scale.y > 100.f) {
+			deleteCloud(i);
+			i--;
+		}
+	}
+
 	//reset button press counters:
 	left.downs = 0;
 	right.downs = 0;
@@ -680,7 +811,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		}
 	}
 
-	{ // Print score
+	{ // Print text
 		glDisable(GL_DEPTH_TEST);
 
 		float aspect = float(drawable_size.x) / float(drawable_size.y);
@@ -691,15 +822,143 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			0.0f, 0.0f, 0.0f, 1.0f
 		));
 
-		constexpr float H = 0.09f;
-		lines.draw_text("Score: " + std::to_string(score),
-			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		float H = 0.1f;
 		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Score: " + std::to_string(score),
-			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		auto drawText = [&](std::string str, float x, float y, glm::u8vec4 color, bool bold = false) {
+			int thickness = 1;
+			if (bold) {
+				thickness = 3;
+			}
+			for (int i = -thickness; i <= thickness; i++) {
+				for (int j = -thickness; j <= thickness; j++) {
+					lines.draw_text(str,
+						glm::vec3(-aspect + x * H + ofs * j, -1.0 + y * H + ofs * i, 0.0),
+						glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+						glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+				}
+			}
+
+			if (bold) {
+				for (int i = -1; i <= 1; i++) {
+					for (int j = -1; j <= 1; j++) {
+						lines.draw_text(str,
+							glm::vec3(-aspect + x * H + ofs * j, -1.0 + y * H + ofs * i, 0.0),
+							glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+							color);
+					}
+				}
+			}
+			else {
+				lines.draw_text(str,
+					glm::vec3(-aspect + x * H, -1.0 + y * H, 0.0),
+					glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+					color);
+			}
+		};
+		
+		// Print score text
+		drawText("Score: ", 0.2f, 2.f, glm::u8vec4(0xff, 0xff, 0xff, 0xff));
+		glm::u8vec4 score_color = score >= 0 ? glm::u8vec4(0xff, 0xff, 0xff, 0xff) : glm::u8vec4(0xd8, 0x00, 0x00, 0xff);
+		drawText(std::to_string(score), 3.f, 2.f, score_color, true);
+		
+		// Print grade text
+		drawText("Grade: ", 0.2f, 0.2f, glm::u8vec4(0xff, 0xff, 0xff, 0xff));
+		std::string grade;
+		glm::u8vec4 grade_color;
+
+		// Calculate the grade and associated color
+		float grade_score;
+		if (perfect_score == 0) {
+			// This happens if the player hasn't done anything yet
+			if (score == 0) {
+				grade = "";
+				grade_color = glm::u8vec4(0x00, 0x00, 0x00, 0xff);
+			}
+			else {
+				// Now that I think about it, I'm pretty sure this should never happen
+				grade = "F";
+				grade_color = glm::u8vec4(0x40, 0x00, 0x00, 0xff);
+			}
+		}
+		else {
+			// Grade is score as percentage of perfect score
+			grade_score = (float)score / (float)perfect_score;
+
+			// Calculate grade and color in normal case
+			// Note that we kind of fudge the grades here; S is 90+, A is 80+, etc. It just feels better.
+			if (grade_score >= 0.9f) {
+				grade_color = glm::u8vec4(0x00, 0xd8, 0xff, 0xff);
+				if (grade_score > 0.99999f) {
+					grade = "SS";
+				}
+				else if (grade_score >= 0.97f) {
+					grade = "S+";
+				}
+				else if (grade_score >= 0.93f) {
+					grade = "S";
+				}
+				else {
+					grade = "S-";
+				}
+			}
+			else if (grade_score >= 0.8f) {
+				grade_color = glm::u8vec4(0x00, 0xd8, 0x00, 0xff);
+				if (grade_score >= 0.87f) {
+					grade = "A+";
+				}
+				else if (grade_score >= 0.83f) {
+					grade = "A";
+				}
+				else {
+					grade = "A-";
+				}
+			}
+			else if (grade_score >= 0.7f) {
+				grade_color = glm::u8vec4(0xff, 0xd8, 0x00, 0xff);
+				if (grade_score >= 0.77f) {
+					grade = "B+";
+				}
+				else if (grade_score >= 0.73f) {
+					grade = "B";
+				}
+				else {
+					grade = "B-";
+				}
+			}
+			else if (grade_score >= 0.6f) {
+				grade_color = glm::u8vec4(0xff, 0x80, 0x00, 0xff);
+				if (grade_score >= 0.67f) {
+					grade = "C+";
+				}
+				else if (grade_score >= 0.63) {
+					grade = "C";
+				}
+				else {
+					grade = "C-";
+				}
+			}
+			else if (grade_score >= 0.5f) {
+				grade_color = glm::u8vec4(0xd8, 0x00, 0x00, 0xff);
+				if (grade_score >= 0.57f) {
+					grade = "D+";
+				}
+				else if (grade_score >= 0.53) {
+					grade = "D";
+				}
+				else {
+					grade = "D-";
+				}
+			}
+			else {
+				grade = "F";
+				grade_color = glm::u8vec4(0x40, 0x00, 0x00, 0xff);
+			}
+		}
+		
+		// Print the grade
+		drawText(grade, 3.f, .2f, grade_color, true);
+
+		// Print some brief instructions
+		drawText("R: Restart. 1-9: Change Difficulty.", 14.f, .2f, glm::u8vec4(0xFF, 0xFF, 0xFF, 0xFF));
 	}
 }
